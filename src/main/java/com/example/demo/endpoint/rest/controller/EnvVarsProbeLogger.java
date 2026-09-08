@@ -3,22 +3,26 @@ package com.example.demo.endpoint.rest.controller;
 import static com.example.demo.endpoint.rest.controller.EnvVarsProbe.UNRESOLVED;
 
 import com.example.demo.PojaGenerated;
-import java.util.Map;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.stereotype.Component;
 
+/**
+ * Reports the same measurements as the HTTP probe, at startup, so that a worker function can be
+ * observed through its log group. A worker has no HTTP surface and cannot be reached otherwise.
+ */
 @PojaGenerated
-@RestController
-public class EnvVarsProbeController {
+@Slf4j
+@Component
+public class EnvVarsProbeLogger {
 
   private final ConfigurableEnvironment environment;
   private final String upperViaValue;
   private final String dottedViaValue;
 
-  public EnvVarsProbeController(
+  public EnvVarsProbeLogger(
       ConfigurableEnvironment environment,
       @Value("${POJA_PROBE_VALUE:" + UNRESOLVED + "}") String upperViaValue,
       @Value("${poja.probe.value:" + UNRESOLVED + "}") String dottedViaValue) {
@@ -27,8 +31,9 @@ public class EnvVarsProbeController {
     this.dottedViaValue = dottedViaValue;
   }
 
-  @GetMapping("/env-vars-probe")
-  public Map<String, Object> probe(@RequestParam(defaultValue = "POJA_PROBE_VALUE") String name) {
-    return EnvVarsProbe.report(environment, name, upperViaValue, dottedViaValue);
+  @PostConstruct
+  public void report() {
+    EnvVarsProbe.report(environment, "POJA_PROBE_VALUE", upperViaValue, dottedViaValue)
+        .forEach((key, value) -> log.info("env-vars-probe: {} = {}", key, value));
   }
 }
